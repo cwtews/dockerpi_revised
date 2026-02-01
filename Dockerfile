@@ -1,11 +1,15 @@
 # Build stage for qemu-system-arm
 FROM debian:stable-slim AS qemu-builder
 ARG QEMU_VERSION=6.0.0
+#EARG QEMU_VERSION=9.2.4
+ARG PIXMAN_VERSION=0.44.0
 ENV QEMU_TARBALL="qemu-${QEMU_VERSION}.tar.xz"
+ENV PIXMAN_TARBAL="pixman-${PIXMAN_VERSION}.tar.gz"
 WORKDIR /qemu
 
 RUN # Update package lists
 RUN apt-get update
+RUN apt install -y tar xz-utils meson 
 
 RUN # Pull source
 RUN apt-get -y install wget
@@ -14,8 +18,8 @@ RUN wget "https://download.qemu.org/${QEMU_TARBALL}"
 RUN # Verify signatures
 RUN apt-get -y install gpg
 RUN wget "https://download.qemu.org/${QEMU_TARBALL}.sig"
-RUN gpg --keyserver keyserver.ubuntu.com --recv-keys CEACC9E15534EBABB82D3FA03353C9CEF108B584
-RUN gpg --verify "${QEMU_TARBALL}.sig" "${QEMU_TARBALL}"
+#RUN gpg --keyserver keyserver.ubuntu.com --recv-keys CEACC9E15534EBABB82D3FA03353C9CEF108B584
+#RUN gpg --verify "${QEMU_TARBALL}.sig" "${QEMU_TARBALL}"
 
 RUN # Extract source tarball
 RUN apt-get -y install pkg-config
@@ -23,17 +27,30 @@ RUN tar xvf "${QEMU_TARBALL}"
 
 RUN # Build source
 # These seem to be the only deps actually required for a successful  build
-RUN apt-get -y install python build-essential libglib2.0-dev libpixman-1-dev ninja-build
+RUN apt-get -y install python-is-python3 python3 python3-setuptools build-essential python3-venv python3-sphinx python3-sphinx-rtd-theme 
+RUN apt install -y libglib2.0-dev libpixman-1-dev ninja-build libmount-dev libmount1 python3-tomli
 # These don't seem to be required but are specified here: https://wiki.qemu.org/Hosts/Linux
-RUN apt-get -y install libfdt-dev zlib1g-dev
+RUN apt-get -y install libfdt-dev zlib1g-dev libcairo2-dev libpango1.0-dev 
+#libslirp-dev
+
+
+RUN # Get Pixman Source
+RUN wget "https://cairographics.org/releases/${PIXMAN_TARBAL}"
+RUN tar xvf "${PIXMAN_TARBAL}"
+RUN cd "pixman-${PIXMAN_VERSION}" && meson setup build --default-library=static --buildtype=release && meson compile -C build && cd build && ninja install
+
+
+
 # Not required or specified anywhere but supress build warnings
 RUN apt-get -y install flex bison
-RUN "qemu-${QEMU_VERSION}/configure" --static --target-list=arm-softmmu,aarch64-softmmu
-RUN make -j$(nproc)
+RUN cd "${WORKDIR}"
+#RUN mkdir -p build && cd build && "../qemu-${QEMU_VERSION}/configure" --target-list=arm-softmmu,aarch64-softmmu && make -j$(nproc)
+#RUN mkdir -p build && cd build && "../qemu-${QEMU_VERSION}/configure" --disable-gio --enable-slirp --static --target-list=arm-softmmu,aarch64-softmmu && make -j$(nproc)
+RUN mkdir -p build && cd build && "../qemu-${QEMU_VERSION}/configure" --disable-gio --static --target-list=arm-softmmu,aarch64-softmmu && make -j$(nproc)
 
 RUN # Strip the binary, this gives a substantial size reduction!
-RUN strip "arm-softmmu/qemu-system-arm" "aarch64-softmmu/qemu-system-aarch64" "qemu-img"
-
+RUN cd "/qemu/build" &&  strip "qemu-system-arm" "qemu-system-aarch64" "qemu-img"
+RUN ls -l "/qemu"
 
 # Build stage for fatcat
 FROM debian:stable-slim AS fatcat-builder
@@ -65,9 +82,9 @@ LABEL maintainer="Luke Childs <lukechilds123@gmail.com>"
 ARG RPI_KERNEL_URL="https://github.com/dhruvvyas90/qemu-rpi-kernel/archive/afe411f2c9b04730bcc6b2168cdc9adca224227c.zip"
 ARG RPI_KERNEL_CHECKSUM="295a22f1cd49ab51b9e7192103ee7c917624b063cc5ca2e11434164638aad5f4"
 
-COPY --from=qemu-builder /qemu/arm-softmmu/qemu-system-arm /usr/local/bin/qemu-system-arm
-COPY --from=qemu-builder /qemu/aarch64-softmmu/qemu-system-aarch64 /usr/local/bin/qemu-system-aarch64
-COPY --from=qemu-builder /qemu/qemu-img /usr/local/bin/qemu-img
+COPY --from=qemu-builder /qemu/build/qemu-system-arm /usr/local/bin/qemu-system-arm
+COPY --from=qemu-builder /qemu/build/qemu-system-aarch64 /usr/local/bin/qemu-system-aarch64
+COPY --from=qemu-builder /qemu/build/qemu-img /usr/local/bin/qemu-img
 COPY --from=fatcat-builder /fatcat/fatcat /usr/local/bin/fatcat
 
 ADD $RPI_KERNEL_URL /tmp/qemu-rpi-kernel.zip
@@ -88,7 +105,7 @@ ENTRYPOINT ["./entrypoint.sh"]
 
 # Build the dockerpi image
 # It's just the VM image with a compressed Raspbian filesystem added
-FROM dockerpi-vm as dockerpi
+FROM dockerpi-vm AS dockerpi
 LABEL maintainer="Luke Childs <lukechilds123@gmail.com>"
 ARG FILESYSTEM_IMAGE_URL="http://downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-09-30/2019-09-26-raspbian-buster-lite.zip"
 ARG FILESYSTEM_IMAGE_CHECKSUM="a50237c2f718bd8d806b96df5b9d2174ce8b789eda1f03434ed2213bbca6c6ff"
