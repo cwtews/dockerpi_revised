@@ -2,49 +2,52 @@
 	<img width="256" src="media/logo.svg">
 </div>
 
-# dockerpi
+# dockerpi_revised
 
-[![Docker Pulls](https://badgen.net/docker/pulls/lukechilds/dockerpi?icon=docker&label=Docker%20pulls)](https://hub.docker.com/r/lukechilds/dockerpi/)
-[![Docker Image Size](https://badgen.net/docker/size/lukechilds/dockerpi/latest/amd64?icon=docker&label=lukechilds/dockerpi)](https://hub.docker.com/r/lukechilds/dockerpi/tags)
-[![GitHub Donate](https://badgen.net/badge/GitHub/Sponsor/D959A7?icon=github)](https://github.com/sponsors/lukechilds)
-[![Bitcoin Donate](https://badgen.net/badge/Bitcoin/Donate/F19537?icon=bitcoin)](https://lu.ke/tip/bitcoin)
-[![Lightning Donate](https://badgen.net/badge/Lightning/Donate/F6BC41?icon=bitcoin-lightning)](https://lu.ke/tip/lightning)
+This is a 2026 update to Luke Childs' dockerpi for Ubuntu 24.04.3 LTS.
 
-> A Virtualised Raspberry Pi inside a Docker image
+## Changes
+* Updated the dependencies.
+* Added pixman static library building from source as the standard Ubuntu library would not work.
+* Disabled gio within qemu as libmount would not correctly statically link.
+* Updated temporary build locations per meson requirements.
+* Commented out image resizing within entrypoint.sh due to a math error.
 
-Gives you access to a virtualised ARM based Raspberry Pi machine running the Raspian operating system.
-
-This is not just a Raspian Docker image, it's a full ARM based Raspberry Pi virtual machine environment.
-
-<div align="center">
-	<img src="media/demo.svg" width="720">
-</div>
+## TODO
+* Track down the math error in entrypoint.sh.
+* Newer versions of QEMU require libslirp-dev.  Need to pull this from source for static library building.
+* Need to test if passing in a external raspbian image works.
+* Need to test newer raspbian images.
+* Need to test if filesystem mounting works.
 
 ## Usage
 
 ```
-docker run -it lukechilds/dockerpi
-```
-
-By default all filesystem changes will be lost on shutdown. You can persist filesystem changes between reboots by mounting the `/sdcard` volume on your host:
+01_build_no_cache.sh
 
 ```
-docker run -it -v $HOME/.dockerpi:/sdcard lukechilds/dockerpi
+
+Build the docker image with output name dockepi_image
+
+```
+
+05_run_me.sh
+
+```
+
+Instantiate the dockerpi_image.
+
+* By default all filesystem changes will be lost on shutdown. You can persist filesystem changes between reboots by mounting the `/sdcard` volume on your host:
+
+```
+docker run -it -v $HOME/.dockerpi:/sdcard dockerpi_image
 ```
 
 If you have a specific image you want to mount you can mount it at `/sdcard/filesystem.img`:
 
 ```
-docker run -it -v /2019-09-26-raspbian-buster-lite.img:/sdcard/filesystem.img lukechilds/dockerpi
-```
+docker run -it -v /2019-09-26-raspbian-buster-lite.img:/sdcard/filesystem.img dockerpi_image
 
-If you only want to mount your own image, you can download a much slimmer VM only Docker container that doesn't contain the Raspbian filesystem image:
-
-[![Docker Image Size](https://badgen.net/docker/size/lukechilds/dockerpi/latest/amd64?icon=docker&label=lukechilds/dockerpi:latest)](https://hub.docker.com/r/lukechilds/dockerpi/tags?name=latest)
-[![Docker Image Size](https://badgen.net/docker/size/lukechilds/dockerpi/vm/amd64?icon=docker&label=lukechilds/dockerpi:vm)](https://hub.docker.com/r/lukechilds/dockerpi/tags?name=vm)
-
-```
-docker run -it -v /2019-09-26-raspbian-buster-lite.img:/sdcard/filesystem.img lukechilds/dockerpi:vm
 ```
 
 ## Which machines are supported?
@@ -108,6 +111,8 @@ docker build -t lukechilds/dockerpi:vm --target dockerpi-vm .
 ```
 
 ## Credit
+
+Thanks to Luke Childs for his work!
 
 Thanks to [@dhruvvyas90](https://github.com/dhruvvyas90) for his [dhruvvyas90/qemu-rpi-kernel](https://github.com/dhruvvyas90/qemu-rpi-kernel) repo.
 
